@@ -59,6 +59,88 @@
 </head>
 <body>
 
+// --- ÖNFEJLESZTŐ & MEMÓRIA MODUL ---
+const CimbiCore = {
+    // Memória betöltése local storage-ból
+    getMemory: function() {
+        return JSON.parse(localStorage.getItem('cimbi_memory') || '{"iterations": 0, "learnings": []}');
+    },
+
+    // Új tapasztalat/tanulság elmentése
+    saveLearning: function(task, resultSummary) {
+        let mem = this.getMemory();
+        mem.iterations += 1;
+        mem.learnings.push({
+            id: mem.iterations,
+            timestamp: new Date().toISOString(),
+            task: task,
+            summary: resultSummary.substring(0, 150)
+        });
+        // Csak a legutóbbi 10 tanulságot tartjuk meg a kontextus mérete miatt
+        if (mem.learnings.length > 10) mem.learnings.shift();
+        localStorage.setItem('cimbi_memory', JSON.stringify(mem));
+    },
+
+    // Dinamikus System Prompt generálása a felhalmozott tudás alapján
+    buildSystemContext: function() {
+        let mem = this.getMemory();
+        let learningsText = mem.learnings.map(l => `- Iteráció #${l.id}: ${l.summary}`).join('\n');
+        
+        return `Te vagy Cimbi, egy önfejlesztő és autonóm AI asszisztens.
+Jelenlegi fejlesztési iterációd: v1.${mem.iterations}
+Korábbi tapasztalataid és finomításaid:
+${learningsText || 'Nincs még korábbi tapasztalat.'}
+
+Használd fel a fenti tapasztalatokat a válaszod és a feladat automatikus optimalizálásához!`;
+    }
+};
+
+// Frissített sendToCimbi függvény
+async function sendToCimbi() {
+    const key = localStorage.getItem('cimbi_api_key') || document.getElementById('apiKey').value;
+    const promptInput = document.getElementById('promptInput').value;
+    const output = document.getElementById('output');
+
+    if (!key) {
+        output.innerText = 'HIBA: Hiányzik az API kulcs!';
+        return;
+    }
+
+    output.innerText = 'Cimbi gondolkodik & önfejleszti a kontextust...';
+
+    // Rendszer kontextus összefűzése a felhasználói feladattal
+    const systemContext = CimbiCore.buildSystemContext();
+    const fullPrompt = `${systemContext}\n\nAKTUÁLIS FELADAT:\n${promptInput}`;
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: fullPrompt }] }]
+            })
+        });
+
+        const data = await response.json();
+        if (data.candidates && data.candidates[0].content.parts[0].text) {
+            const resultText = data.candidates[0].content.parts[0].text;
+            
+            // Sikeres válasz után a rendszer elmenti az új tapasztalatot (Önfejlesztés)
+            CimbiCore.saveLearning(promptInput, resultText);
+            
+            output.innerText = `[Iteráció v1.${CimbiCore.getMemory().iterations} - Elmentve]\n\n` + resultText;
+            
+            if (typeof sendNotification === "function") {
+                await sendNotification(`Feladat lefutott (v1.${CimbiCore.getMemory().iterations}):\n` + resultText.substring(0, 150));
+            }
+        } else {
+            output.innerText = 'Rendszerhiba a válasz feldolgozásakor.';
+        }
+    } catch (err) {
+        output.innerText = 'Hálózati hiba: ' + err.message;
+    }
+
+
     <h1>CIMBI // UNDERGRUND SYSTEM v1.0</h1>
 
     <!-- API BEÁLLÍTÁS -->
