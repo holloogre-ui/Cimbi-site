@@ -135,8 +135,9 @@ async function sendToCimbi() {
             }
         } else {
             output.innerText = 'Rendszerhiba a válasz feldolgozásakor.';
-        }
-    } catch (err) {
+"Te vagy Cimbi, egy közvetlen, műszaki és logisztikai partner. A válaszod legyen lényegretörő: " + prompt }] }]
+}) // <-- EZT A KEREK ZÁRÓJELET KELL ODATENNI!
+});
         output.innerText = 'Hálózati hiba: ' + err.message;
     }
 
